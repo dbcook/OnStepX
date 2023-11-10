@@ -1,5 +1,5 @@
 .vscode/settings.json
-*.json
+.vscode/c_cpp_properties.json
 __vm/*
 *.vcxproj*
 .vs/*
@@ -8,5 +8,4 @@ Debug/*
 Release/*
 debug.cfg
 esp32.svd
-src/plugins/*
 debug.svd
