@@ -82,23 +82,28 @@ void SerialWrapper::begin() { begin(9600); }
 void SerialWrapper::begin(long baud) {
   uint8_t channel = 0;
   #ifdef SERIAL_A
-    if (isChannel(channel++))
+    if (isChannel(channel++)) {
+      D("Starting SERIAL_A, baud "); DL(baud);
       #if defined(SERIAL_A_RX) && defined(SERIAL_A_TX) && !defined(SERIAL_A_RXTX_SET)
         SERIAL_A.begin(baud, SERIAL_8N1, SERIAL_A_RX, SERIAL_A_TX);
       #else
         SERIAL_A.begin(baud);
       #endif
+    }
   #endif
   #ifdef SERIAL_B
-    if (isChannel(channel++))
+    if (isChannel(channel++)) {
+      D("Starting SERIAL_B, baud "); DL(baud);
       #if defined(SERIAL_B_RX) && defined(SERIAL_B_TX) && !defined(SERIAL_B_RXTX_SET)
         SERIAL_B.begin(baud, SERIAL_8N1, SERIAL_B_RX, SERIAL_B_TX);
       #else
         SERIAL_B.begin(baud);
       #endif
+    }
   #endif
   #ifdef SERIAL_C
     if (isChannel(channel++))
+      D("Starting SERIAL_C, baud "); DL(baud);
       #if defined(SERIAL_C_RX) && defined(SERIAL_C_TX) && !defined(SERIAL_C_RXTX_SET)
         SERIAL_C.begin(baud, SERIAL_8N1, SERIAL_C_RX, SERIAL_C_TX);
       #else
@@ -106,6 +111,7 @@ void SerialWrapper::begin(long baud) {
       #endif
   #endif
   #ifdef SERIAL_D
+    D("Starting SERIAL_D, baud "); DL(baud);
     if (isChannel(channel++))
       #if defined(SERIAL_D_RX) && defined(SERIAL_D_TX) && !defined(SERIAL_D_RXTX_SET)
         SERIAL_D.begin(baud, SERIAL_8N1, SERIAL_D_RX, SERIAL_D_TX);
@@ -114,7 +120,10 @@ void SerialWrapper::begin(long baud) {
       #endif
   #endif
   #ifdef SERIAL_ST4
-    if (isChannel(channel++)) SERIAL_ST4.begin(baud);
+    if (isChannel(channel++)) {
+      D("Starting SERIAL_ST4, baud "); VL(baud);
+      SERIAL_ST4.begin(baud);
+    }
   #endif
   #ifdef SERIAL_BT
     //if (isChannel(channel++)) SERIAL_BT.begin(SERIAL_BT_NAME); // started early in .ino file
@@ -132,7 +141,10 @@ void SerialWrapper::begin(long baud) {
     if (isChannel(channel++)) SERIAL_SIP.begin(9999, 10L*1000L, true);
   #endif
   #ifdef SERIAL_LOCAL
-    if (isChannel(channel++)) SERIAL_LOCAL.begin(baud);
+    if (isChannel(channel++)) {
+      D("Starting SERIAL_LOCAL, baud "); VL(baud);
+      SERIAL_LOCAL.begin(baud);
+    }
   #endif
   UNUSED(baud);
   UNUSED(channel);
