@@ -77,8 +77,18 @@ void setup() {
   #endif
 
   #if DEBUG != OFF
-    SERIAL_DEBUG.begin(SERIAL_DEBUG_BAUD);
-    delay(2000);
+    SERIAL_DEBUG.begin(SERIAL_DEBUG_BAUD);  // has no effect when SERIAL_DEBUG == Serial on Teensy (USB serial monitor)
+    #if DEBUG_HARD_WAIT_FOR_MONITOR == ON
+      // wait indefinitely for serial monitor to be connected - not suitable for production!
+      while (!Serial) {
+      }
+      Serial.println("Monitor connected");
+    #elif DEBUG_HARD_WAIT_FOR_MONITOR == OFF
+      // no delay
+    #else
+      // fixed delay so startup proceeds even if engineer is asleep
+      delay(DEBUG_HARD_WAIT_FOR_MONITOR*1000);
+    #endif
   #endif
 
   // let any special processing the pinmap needs happen
