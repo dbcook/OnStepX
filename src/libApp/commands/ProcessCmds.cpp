@@ -109,10 +109,38 @@ CommandProcessor::~CommandProcessor() {
 }
 
 void CommandProcessor::poll() {
-  if (!serialReady) { delay(200); SerialPort.begin(serialBaud); serialReady = true; }
+  // Open serial port (once only!) if it hasn't been opened yet
+  if (!serialReady) {
+    // dbc: changed blocking delay() to yield
+    tasks.yield(200);
+    SerialPort.begin(serialBaud);
+    serialReady = true;
+    if (channel == 'A'){
+      D("SERIAL_A opened: ");
+      if (SERIAL_A == Serial1) {
+        DL("Serial1");
+      }
+      else
+        DL("not Serial1");
+    }
+    if (channel == 'B'){
+      D("SERIAL_B opened: ");
+      if (SERIAL_B == Serial2) {
+        DL("Serial2");
+      }
+      else
+        DL("not Serial2");
+    }
+  }
 
   unsigned long tout = micros() + 500;
-  while (SerialPort.available()) { char c = SerialPort.read(); buffer.add(c); if (buffer.ready() || (long)(micros() - tout) > 0) break; }
+  while (SerialPort.available()) { 
+    char c = SerialPort.read();
+    buffer.add(c);
+    if (buffer.ready() || (long)(micros() - tout) > 0) {
+      break; 
+    }
+  }
 
   if (buffer.ready()) {
     char reply[80] = "";
