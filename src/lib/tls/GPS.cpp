@@ -72,22 +72,59 @@ bool TimeLocationSource::init() {
   #endif
 
   // check to see if the GPS is present
-  tasks.yield(500);
-  if (!SERIAL_GPS.available()) {
-    VLF("WRN: TLS, GPS serial RX interface is quiet!");
-    return false;
-  } else {
-    unsigned long timeout = millis() + 1000UL;
-    while (SERIAL_GPS.available() > 0) {
-      if (gps.encode(SERIAL_GPS.read())) break;
-      if ((long)(millis() - timeout) > 0) {
-        VLF("WRN: TLS, GPS serial RX interface no NMEA sentences detected!");
-        return false;
-      }
-      Y;
-    }
-  }
+  // *** dbc: I changed the logic here to fix somee problems.
+  //     I was seeing "Site, falling back to Date/Time from NV" before the sentences ever start 
+  //     because Site.init() expects the date/time to be available by the time it's called.
+  // 
+  //  We need a new strategy here.
+  //    If enabled, the GPS TLS should alway run and make maximum effort to provide accurate position and time.
+  //    Time and location are handled separately.
+  //    Priority of time setting:
+  //      0) If no date/time source available, allow basic tracking but disallow GOTO ops
+  //      1) Last known date/time from NV.  Time from NV is only useful for GOTO on a quick reboot of OnStep.
+  //      2) battery backed RTC date/time (onboard or outboard, sets system clock at boot)
+  //      3) Manually entered date/time (independent fields, sets system clock when entered via UI)
+  //      4) system clock
+  //      5) NTP time source (runtime enable/disable, valid NTP time defeats all lower priority sources if enabled)
+  //      6) GPS time source (runtime enable/disable, valid GPS sentence defeats all lower priority sources if enabled)
+  //      7) GPS time source with PPS (runtime enable/disable, valid GPS+PPS defeats all lower priority sources if enabled)
+  //    Priority of location setting:  (look at altitude handling!)
+  //      0) If no location source available, allow basic tracking but disallow GOTO ops.
+  //      1) Last known location from NV (loaded at boot)
+  //      2) Manually entered location (active until overwritten by enabled GPS source)
+  //      3) GPS location source (runtime enable/disable, valid GPS sentence always wins if enabled)
+  //   Notes:
+  //      If GPS location and time are available, there is probably no reason ever to not use them.  Typical GPS
+  //      accuracy of a few meters is a fraction of an arcsec (28m == 1 arcsec)
+  //      Continuous update of GPS location and time (with appropriate smoothing) eliminates issues
+  //      with local clock drift when OnStep is left running for a long time.  It's also a small step
+  //      toward tracking from mobile platforms.
+  //      If you want manual overrides to have effect, you need to turn off NTP and GPS sources.
+  // ***
 
+  // Wait a reasonable time until we see GPS input chars
+  unsigned long timeout = millis() + 5000UL;
+  while(SERIAL_GPS.available() <= 0) {
+    if ((long)(millis() - timeout) > 0) {
+      VLF("WRN: TLS, GPS serial RX interface is quiet!");
+      return false;
+    }
+    tasks.yield(50);
+  }
+  // collect a whole GPS sentence
+  timeout = millis() + 5000UL;
+  while (SERIAL_GPS.available() > 0) {
+    if (gps.encode(SERIAL_GPS.read())) break;
+    if ((long)(millis() - timeout) > 0) {
+      VLF("WRN: TLS, GPS serial RX interface no NMEA sentences detected!");
+      return false;
+    }
+    Y;
+  }
+  // Launch the GPS poller to monitor the GPS messages.  It waits for a fix with suitable HDOP
+  // and sets the ready flag when it sees one.
+  // Site init will load time/loc from NV and start a longish (10min) but not infinite timer to
+  // receive a GPS fix via the 'gpsChk' task.
   VF("MSG: TLS, GPS start monitor task (rate 10ms priority 7)... ");
   if (tasks.add(1, 0, true, 7, gpsPoll, "gpsPoll")) { VLF("success"); active = true; } else { VLF("FAILED!"); }
 
@@ -132,13 +169,16 @@ void TimeLocationSource::getSite(double &latitude, double &longitude, float &ele
 
 void TimeLocationSource::poll() {
   while (SERIAL_GPS.available() > 0) {
-    gps.encode(SERIAL_GPS.read());
+    int c = SERIAL_GPS.read();
+    gps.encode(c);
+    //Serial.printf("%c", c);
   }
 
   if (gps.location.isValid() && siteIsValid()) {
-    if (gps.date.isValid() && gps.time.isValid() && timeIsValid()) {
-      if (waitIsValid()) {
+    if (gps.date.isValid() && gps.time.isValid() && timeIsValid() && gps.hdop.isValid() && (gps.hdop.hdop() < GPS_HDOP_UPPER_LIMIT)) {
+      if (waitIsValid()) {  // nerfed, no hard wait anymore, we look at HDOP right away
         VLF("MSG: TLS, GPS date/time/location is ready");
+        VLF("MSG: GPS HDOP = "); VL(gps.hdop.hdop());
 
         VLF("MSG: TLS, closing GPS serial port");
         SERIAL_GPS.end();
@@ -158,6 +198,7 @@ void TimeLocationSource::poll() {
 
 // starts keeping track of the wait once (PPS is synced, if applicable) and GPS has a lock 
 bool TimeLocationSource::waitIsValid() {
+  return true; // nerf the hard wait
   if (startTime == 0) startTime = millis();
   unsigned long t = millis() - startTime;
   return (t/1000UL)/60UL >= GPS_MIN_WAIT_MINUTES;
