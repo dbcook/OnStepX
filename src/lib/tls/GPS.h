@@ -10,9 +10,11 @@
 #include "../calendars/Calendars.h"
 
 #ifndef GPS_TIMEOUT_MINUTES
-  #define GPS_TIMEOUT_MINUTES 10 // wait up to 10 minutes to get lock, use 0 to disable timeout
+  // dbc: The logic in Site.cpp does not disable the timeout if GPS_TIMEOUT_MINUTES is set to zero, but will fire instantly.
+  #define GPS_TIMEOUT_MINUTES 10000 // wait this long for GPS lock, 0 is supposed to disable timeout but doesn't
 #endif
 #ifndef GPS_MIN_WAIT_MINUTES
+  // dbc: GPS_MIN_WAIT_MINUTES has no more effect, we now wait for HDOP under a threshold.
   #define GPS_MIN_WAIT_MINUTES 2 // minimum wait for stabilization in minutes, use 0 to disable
 #endif
 
